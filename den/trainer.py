@@ -7,9 +7,10 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
 import numpy as np
-from typing import Optional, Dict, Any, List, Callable
+from typing import Optional, Dict, Any, List, Callable, Type, Union
 import time
 from pathlib import Path
+import datetime
 
 from .core import DynamicExpandableNetwork
 from .growth_strategy import GrowthStrategy, LossBasedGrowth
@@ -31,7 +32,8 @@ class DENTrainer:
         self,
         network: DynamicExpandableNetwork,
         growth_strategy: Optional[GrowthStrategy] = None,
-        optimizer: str = 'adam',
+        optimizer: Union[Type[optim.Optimizer], optim.Optimizer] = optim.Adam,
+        optimizer_kwargs: Optional[Dict[str, Any]] = None,
         learning_rate: float = 0.001,
         loss_function: Optional[nn.Module] = None,
         device: str = 'cuda' if torch.cuda.is_available() else 'cpu',
@@ -43,7 +45,8 @@ class DENTrainer:
         Args:
             network: DynamicExpandableNetwork instance
             growth_strategy: Strategy for network growth (default: LossBasedGrowth)
-            optimizer: Optimizer name ('adam', 'adamw', 'sgd', 'rmsprop')
+            optimizer: Optimizer class (e.g., optim.Adam, optim.AdamW, optim.SGD)
+            optimizer_kwargs: Additional kwargs for optimizer (e.g., {'weight_decay': 0.01})
             learning_rate: Learning rate
             loss_function: Loss function (default: MSE for regression, CrossEntropy for classification)
             device: Device to train on
@@ -69,37 +72,41 @@ class DENTrainer:
 
         # Optimizer
         self.learning_rate = learning_rate
-        self.optimizer_name = optimizer
-        self.optimizer = self._create_optimizer(optimizer, learning_rate)
+        self.optimizer_class = optimizer
+        self.optimizer_kwargs = optimizer_kwargs or {}
+        self.optimizer = self._create_optimizer()
 
-        # Training history
+        # Training history with timestamps
         self.history = {
             'loss': [],
             'val_loss': [],
             'epochs': [],
             'growth_events': [],
-            'architecture_snapshots': []
+            'architecture_snapshots': [],
+            'timestamps': []  # Track wall-clock time
         }
 
+        # Training start time
+        self.training_start_time = None
         # Current epoch
         self.current_epoch = 0
 
-    def _create_optimizer(self, optimizer_name: str, lr: float):
+    def _create_optimizer(self):
         """Create optimizer instance."""
-        if optimizer_name.lower() == 'adam':
-            return optim.Adam(self.network.parameters(), lr=lr)
-        elif optimizer_name.lower() == 'adamw':
-            return optim.AdamW(self.network.parameters(), lr=lr)
-        elif optimizer_name.lower() == 'sgd':
-            return optim.SGD(self.network.parameters(), lr=lr, momentum=0.9)
-        elif optimizer_name.lower() == 'rmsprop':
-            return optim.RMSprop(self.network.parameters(), lr=lr)
+        # Merge learning rate with other kwargs
+        opt_kwargs = {'lr': self.learning_rate, **self.optimizer_kwargs}
+
+        # Create optimizer
+        if isinstance(self.optimizer_class, type):
+            # It's a class, instantiate it
+            return self.optimizer_class(self.network.parameters(), **opt_kwargs)
         else:
-            raise ValueError(f"Unknown optimizer: {optimizer_name}")
+            # It might already be instantiated or a callable
+            raise ValueError("Optimizer must be a class (e.g., optim.Adam)")
 
     def _recreate_optimizer(self):
         """Recreate optimizer after network growth."""
-        self.optimizer = self._create_optimizer(self.optimizer_name, self.learning_rate)
+        self.optimizer = self._create_optimizer()
 
     def train_epoch(
         self,
@@ -243,15 +250,24 @@ class DENTrainer:
 
         start_time = time.time()
 
+        # Initialize training start time if this is the first training
+        if self.training_start_time is None:
+            self.training_start_time = datetime.datetime.now()
+
         for epoch in range(epochs):
             self.current_epoch += 1
+            epoch_start_time = time.time()
 
             # Train one epoch
             metrics = self.train_epoch(train_loader, val_loader)
 
+            # Calculate elapsed time from training start
+            elapsed_from_start = time.time() - start_time
+
             # Update history
             self.history['loss'].append(metrics['loss'])
             self.history['epochs'].append(self.current_epoch)
+            self.history['timestamps'].append(elapsed_from_start)  # Wall-clock time in seconds
             if 'val_loss' in metrics:
                 self.history['val_loss'].append(metrics['val_loss'])
 
@@ -301,9 +317,11 @@ class DENTrainer:
                             print(f"   Added layer at position {growth_action['position']} "
                                   f"with {growth_action['num_neurons']} neurons")
 
-                    # Record growth event
+                    # Record growth event with timestamp
                     self.history['growth_events'].append({
                         'epoch': self.current_epoch,
+                        'timestamp': elapsed_from_start,  # Time in seconds from training start
+                        'datetime': datetime.datetime.now().isoformat(),  # Human-readable timestamp
                         'action': growth_action,
                         'reason': reason,
                         'architecture': self.network.get_architecture_info()

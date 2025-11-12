@@ -47,8 +47,10 @@ pip install -r requirements.txt
 
 ```python
 import torch
+import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 from den import DynamicExpandableNetwork, DENTrainer, LossBasedGrowth
+from den.utils import plot_training_history
 
 # Create your data
 X_train = torch.randn(1000, 10)
@@ -60,7 +62,7 @@ network = DynamicExpandableNetwork(
     input_size=10,
     output_size=1,
     hidden_sizes=[16, 16],  # Start small!
-    activation='relu',
+    activation=nn.ReLU,     # Pass nn.Module class directly
     task_type='regression'
 )
 
@@ -75,7 +77,7 @@ growth_strategy = LossBasedGrowth(
 trainer = DENTrainer(
     network=network,
     growth_strategy=growth_strategy,
-    optimizer='adam',
+    optimizer=torch.optim.Adam,  # Pass optimizer class directly
     learning_rate=0.001
 )
 
@@ -88,6 +90,9 @@ history = trainer.train(
 
 print(f"Final architecture: {network.get_layer_sizes()}")
 print(f"Total parameters: {network.get_num_parameters()}")
+
+# NEW: Plot with wall-clock time on x-axis
+plot_training_history(history, save_path='training_time.png', use_time=True)
 ```
 
 ### Continual Learning
@@ -126,10 +131,16 @@ network = DynamicExpandableNetwork(
     input_size=10,           # Number of input features
     output_size=1,           # Number of outputs
     hidden_sizes=[32, 32],   # Initial hidden layer sizes
-    activation='relu',       # Activation function
+    activation=nn.ReLU,      # Activation function (nn.Module class)
     dropout=0.1,            # Dropout rate (optional)
     task_type='regression'  # 'regression' or 'classification'
 )
+
+# You can also use:
+# activation=nn.Tanh
+# activation=nn.GELU
+# activation=nn.LeakyReLU
+# activation=lambda: nn.ReLU(inplace=True)
 ```
 
 **Key Methods:**
@@ -224,11 +235,17 @@ Handles training with automatic growth.
 trainer = DENTrainer(
     network=network,
     growth_strategy=strategy,
-    optimizer='adamw',          # 'adam', 'adamw', 'sgd', or 'rmsprop'
+    optimizer=torch.optim.AdamW,  # Pass optimizer class directly
+    optimizer_kwargs={'weight_decay': 0.01},  # Optional optimizer parameters
     learning_rate=0.001,
     device='cuda',             # 'cuda' or 'cpu'
     verbose=True
 )
+
+# You can use any PyTorch optimizer:
+# optimizer=torch.optim.Adam
+# optimizer=torch.optim.SGD (with optimizer_kwargs={'momentum': 0.9})
+# optimizer=torch.optim.RMSprop
 ```
 
 **Key Methods:**
@@ -236,6 +253,11 @@ trainer = DENTrainer(
 - `evaluate(data_loader)`: Evaluate performance
 - `continual_learning(new_data, new_targets)`: Learn from new data
 - `predict(data)`: Make predictions
+
+**New in v0.2:**
+- Training history includes timestamps (`timestamps` field)
+- Growth events include `timestamp` and `datetime` fields
+- Plot training vs wall-clock time with `use_time=True`
 
 ## 📊 Visualization and Analysis
 

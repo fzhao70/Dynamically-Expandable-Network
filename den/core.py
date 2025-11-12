@@ -5,7 +5,7 @@ Core implementation of the Dynamically Expandable Network.
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Callable, Union, Type
 import copy
 
 from .layers import ExpandableLinear, ExpandableSequential
@@ -28,8 +28,8 @@ class DynamicExpandableNetwork(nn.Module):
         input_size: int,
         output_size: int,
         hidden_sizes: List[int],
-        activation: str = 'relu',
-        output_activation: Optional[str] = None,
+        activation: Union[nn.Module, Type[nn.Module], Callable[[], nn.Module]] = nn.ReLU,
+        output_activation: Optional[Union[nn.Module, Type[nn.Module], Callable[[], nn.Module]]] = None,
         dropout: float = 0.0,
         task_type: str = 'regression'
     ):
@@ -40,7 +40,7 @@ class DynamicExpandableNetwork(nn.Module):
             input_size: Number of input features
             output_size: Number of output features
             hidden_sizes: List of hidden layer sizes (initial architecture)
-            activation: Activation function ('relu', 'tanh', 'sigmoid', 'gelu')
+            activation: Activation function (e.g., nn.ReLU, nn.Tanh(), or nn.ReLU())
             output_activation: Activation for output layer (None for regression)
             dropout: Dropout probability (0.0 = no dropout)
             task_type: 'regression' or 'classification'
@@ -51,8 +51,8 @@ class DynamicExpandableNetwork(nn.Module):
         self.output_size = output_size
         self.initial_hidden_sizes = hidden_sizes.copy()
         self.hidden_sizes = hidden_sizes.copy()
-        self.activation_name = activation
-        self.output_activation_name = output_activation
+        self.activation_fn = activation
+        self.output_activation_fn = output_activation
         self.dropout_prob = dropout
         self.task_type = task_type
 
@@ -65,37 +65,49 @@ class DynamicExpandableNetwork(nn.Module):
         prev_size = input_size
         for hidden_size in hidden_sizes:
             self.layers.append(ExpandableLinear(prev_size, hidden_size))
-            self.activations.append(self._get_activation(activation))
+            self.activations.append(self._create_activation(activation))
             if dropout > 0:
                 self.dropouts.append(nn.Dropout(dropout))
             prev_size = hidden_size
 
         # Output layer
         self.output_layer = ExpandableLinear(prev_size, output_size)
-        self.output_activation = self._get_activation(output_activation) if output_activation else None
+        self.output_activation = self._create_activation(output_activation) if output_activation else None
 
         # Track network growth
         self.growth_history = []
         self.training_history = []
 
-    def _get_activation(self, name: Optional[str]) -> Optional[nn.Module]:
-        """Get activation function by name."""
-        if name is None:
+    def _create_activation(self, activation: Optional[Union[nn.Module, Type[nn.Module], Callable[[], nn.Module]]]) -> Optional[nn.Module]:
+        """
+        Create an activation module from various input types.
+
+        Args:
+            activation: Can be:
+                - An nn.Module instance (e.g., nn.ReLU())
+                - An nn.Module class (e.g., nn.ReLU)
+                - A callable that returns an nn.Module (e.g., lambda: nn.ReLU())
+                - None
+
+        Returns:
+            An nn.Module instance or None
+        """
+        if activation is None:
             return None
 
-        activations = {
-            'relu': nn.ReLU(),
-            'tanh': nn.Tanh(),
-            'sigmoid': nn.Sigmoid(),
-            'gelu': nn.GELU(),
-            'leaky_relu': nn.LeakyReLU(),
-            'elu': nn.ELU(),
-        }
+        # If it's already an instance, return it
+        if isinstance(activation, nn.Module):
+            return activation
 
-        if name.lower() not in activations:
-            raise ValueError(f"Unknown activation: {name}")
+        # If it's a class or callable, instantiate it
+        if callable(activation):
+            try:
+                return activation()
+            except TypeError:
+                # Might be a class that needs no args
+                raise ValueError(f"Activation must be an nn.Module instance, class, or callable that returns an nn.Module")
 
-        return activations[name.lower()]
+        raise ValueError(f"Invalid activation type: {type(activation)}")
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward pass through the network."""
@@ -149,7 +161,7 @@ class DynamicExpandableNetwork(nn.Module):
             'neurons_added': num_neurons
         })
 
-    def expand_depth(self, position: int, num_neurons: int, activation: Optional[str] = None):
+    def expand_depth(self, position: int, num_neurons: int, activation: Optional[Union[nn.Module, Type[nn.Module], Callable[[], nn.Module]]] = None):
         """
         Add a new layer to the network.
 
@@ -184,8 +196,8 @@ class DynamicExpandableNetwork(nn.Module):
 
         # Add activation
         if activation is None:
-            activation = self.activation_name
-        self.activations.insert(position, self._get_activation(activation))
+            activation = self.activation_fn
+        self.activations.insert(position, self._create_activation(activation))
 
         # Add dropout if needed
         if self.dropouts is not None:
@@ -245,7 +257,7 @@ class DynamicExpandableNetwork(nn.Module):
             'hidden_sizes': self.get_layer_sizes(),
             'num_layers': len(self.layers),
             'num_parameters': self.get_num_parameters(),
-            'activation': self.activation_name,
+            'activation': str(type(self.activation_fn).__name__) if self.activation_fn else 'None',
             'dropout': self.dropout_prob,
             'task_type': self.task_type,
             'growth_history': self.growth_history
@@ -258,8 +270,8 @@ class DynamicExpandableNetwork(nn.Module):
             self.input_size,
             self.output_size,
             self.initial_hidden_sizes,
-            self.activation_name,
-            self.output_activation_name,
+            self.activation_fn,
+            self.output_activation_fn,
             self.dropout_prob,
             self.task_type
         )
@@ -277,8 +289,8 @@ class DynamicExpandableNetwork(nn.Module):
             'output_size': self.output_size,
             'hidden_sizes': self.hidden_sizes,
             'initial_hidden_sizes': self.initial_hidden_sizes,
-            'activation': self.activation_name,
-            'output_activation': self.output_activation_name,
+            'activation_fn': self.activation_fn,
+            'output_activation_fn': self.output_activation_fn,
             'dropout': self.dropout_prob,
             'task_type': self.task_type,
             'growth_history': self.growth_history,
@@ -305,8 +317,8 @@ class DynamicExpandableNetwork(nn.Module):
             input_size=checkpoint['input_size'],
             output_size=checkpoint['output_size'],
             hidden_sizes=checkpoint['initial_hidden_sizes'],
-            activation=checkpoint['activation'],
-            output_activation=checkpoint.get('output_activation'),
+            activation=checkpoint.get('activation_fn', checkpoint.get('activation', nn.ReLU)),  # Backward compat
+            output_activation=checkpoint.get('output_activation_fn', checkpoint.get('output_activation')),
             dropout=checkpoint['dropout'],
             task_type=checkpoint['task_type']
         )

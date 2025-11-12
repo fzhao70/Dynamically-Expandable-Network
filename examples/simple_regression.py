@@ -64,7 +64,7 @@ def main():
         input_size=3,
         output_size=1,
         hidden_sizes=[8, 8],  # Start small!
-        activation='relu',
+        activation=nn.ReLU,  # Pass nn.Module class directly
         task_type='regression'
     )
 
@@ -85,7 +85,7 @@ def main():
     trainer = DENTrainer(
         network=network,
         growth_strategy=growth_strategy,
-        optimizer='adam',
+        optimizer=torch.optim.Adam,  # Pass optimizer class directly
         learning_rate=0.001,
         device='cuda' if torch.cuda.is_available() else 'cpu',
         verbose=True
@@ -135,9 +135,10 @@ def main():
     # Visualizations
     print("\n9. Creating visualizations...")
     try:
-        plot_training_history(history, save_path='training_history.png')
+        plot_training_history(history, save_path='training_history_epochs.png')
+        plot_training_history(history, save_path='training_history_time.png', use_time=True)
         visualize_network_architecture(network, save_path='final_architecture.png')
-        print("   ✓ Visualizations saved")
+        print("   ✓ Visualizations saved (both epoch-based and time-based)")
     except Exception as e:
         print(f"   Warning: Could not create visualizations: {e}")
 

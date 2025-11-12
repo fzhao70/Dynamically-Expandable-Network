@@ -62,7 +62,7 @@ def main():
         input_size=8,
         output_size=1,
         hidden_sizes=[8, 8],  # Start very small
-        activation='relu',
+        activation=nn.ReLU,
         task_type='regression'
     )
 
@@ -95,7 +95,7 @@ def main():
     trainer = DENTrainer(
         network=network,
         growth_strategy=growth_strategy,
-        optimizer='adamw',  # New AdamW optimizer!
+        optimizer=torch.optim.AdamW,  # New AdamW optimizer!
         learning_rate=0.001,
         verbose=True
     )

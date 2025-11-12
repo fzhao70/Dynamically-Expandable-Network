@@ -107,7 +107,7 @@ def main():
         input_size=20,
         output_size=5,  # 5 classes
         hidden_sizes=[16, 16],  # Start small
-        activation='relu',
+        activation=nn.ReLU,
         task_type='classification'
     )
 
@@ -130,7 +130,7 @@ def main():
     trainer = DENTrainer(
         network=network,
         growth_strategy=growth_strategy,
-        optimizer='adam',
+        optimizer=torch.optim.Adam,
         learning_rate=0.001,
         loss_function=nn.CrossEntropyLoss(),
         device=device,

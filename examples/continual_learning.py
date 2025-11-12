@@ -61,7 +61,7 @@ def main():
         input_size=5,
         output_size=1,
         hidden_sizes=[16, 16],
-        activation='relu',
+        activation=nn.ReLU,
         task_type='regression'
     )
 
@@ -80,7 +80,7 @@ def main():
     trainer = DENTrainer(
         network=network,
         growth_strategy=growth_strategy,
-        optimizer='adam',
+        optimizer=torch.optim.Adam,
         learning_rate=0.001,
         verbose=True
     )
@@ -185,14 +185,14 @@ def main():
         input_size=5,
         output_size=1,
         hidden_sizes=[16, 16],
-        activation='relu',
+        activation=nn.ReLU,
         task_type='regression'
     )
 
     new_trainer = DENTrainer(
         network=new_network,
         growth_strategy=AdaptiveGrowth(),
-        optimizer='adam',
+        optimizer=torch.optim.Adam,
         learning_rate=0.001,
         verbose=True
     )

@@ -345,6 +345,379 @@ Dynamically-Expandable-Network/
 └── README.md
 ```
 
+## 📐 Growth Strategy Mathematics
+
+This section provides detailed mathematical formulations for each growth strategy.
+
+### LossBasedGrowth - Mathematical Formulation
+
+**Core Principle**: Plateau Detection
+Triggers growth when training loss stops improving for a sustained period.
+
+**Decision Criteria:**
+
+1. **Loss Improvement Check:**
+   ```
+   Δₜ = L_best - L_t
+
+   where:
+   - L_t: Current loss at epoch t
+   - L_best: Best loss observed so far
+   - δ: Minimum improvement threshold (min_delta)
+
+   Improvement condition: Δₜ > δ
+   ```
+
+2. **Patience Counter:**
+   ```
+   p_t = {
+       0,           if Δₜ > δ
+       p_{t-1} + 1, otherwise
+   }
+
+   Growth trigger: p_t ≥ P
+   where P = patience parameter
+   ```
+
+3. **Cooldown Period:**
+   ```
+   c_t = epochs since last growth
+
+   Allow growth only if: c_t ≥ C
+   where C = cooldown parameter
+   ```
+
+**Growth Magnitude:**
+
+For **width expansion**:
+```
+n_new = min(⌊n_current × r⌋, n_max)
+
+where:
+- n_current: Current layer size
+- r: width_growth_ratio (default 0.5)
+- n_max: max_neurons_per_expansion
+```
+
+For **depth expansion** (triggered every `depth_threshold` width expansions):
+```
+n_new = min(mean(layer_sizes), n_max)
+position = ⌊num_layers / 2⌋
+```
+
+**Layer Selection for Width Expansion:**
+```
+i* = argmin{|L_i|}
+
+where L_i is the size of layer i
+```
+Choose smallest layer to balance architecture.
+
+---
+
+### GradientBasedGrowth - Mathematical Formulation
+
+**Core Principle**: Under-Parameterization Detection
+Monitors gradient magnitudes to identify layers struggling to learn.
+
+**Gradient Tracking:**
+
+1. **Layer-wise Gradient Norm:**
+   ```
+   g_i^(t) = ||∇_W_i L||₂
+
+   where:
+   - W_i: Weights of layer i
+   - L: Loss function
+   - || · ||₂: L2 norm
+   ```
+
+2. **Temporal Gradient History:**
+   ```
+   G_i = {g_i^(t-k), g_i^(t-k+1), ..., g_i^(t)}
+
+   ḡ_i = (1/k) Σ g_i^(τ)
+
+   where k = hebbian_window
+   ```
+
+3. **Network-Level Gradient:**
+   ```
+   ḡ = (1/N) Σᵢ ḡ_i
+
+   where N = number of layers
+   ```
+
+**Growth Decision:**
+
+Grow when BOTH conditions are met:
+
+```
+Condition 1: ḡ > θ_g  (high gradients)
+Condition 2: p_t ≥ P  (loss plateau)
+
+where:
+- θ_g: gradient_threshold
+- p_t: patience counter (as in LossBasedGrowth)
+```
+
+**Layer Selection:**
+```
+i* = argmax{ḡ_i}
+```
+Expand the layer with highest average gradient (most struggling).
+
+**Growth Magnitude:**
+```
+n_new = min(max(⌊n_i* × 0.3⌋, 1), n_max)
+```
+
+---
+
+### AdaptiveGrowth - Mathematical Formulation
+
+**Core Principle**: Multi-Signal Integration
+Combines loss, gradients, and network capacity for intelligent growth decisions.
+
+**Loss Analysis:**
+
+1. **Loss Standard Deviation:**
+   ```
+   σ_L = √[(1/P) Σ (L_t - L̄)²]
+
+   where L̄ = (1/P) Σ L_t over last P epochs
+   ```
+
+2. **Loss Improvement Rate:**
+   ```
+   ΔL = L_{t-P} - L_t
+   ```
+
+3. **Stagnation Detection:**
+   ```
+   stagnant = (ΔL < θ_L) ∧ (σ_L < θ_L)
+
+   where θ_L = loss_threshold
+   ```
+
+**Network Efficiency:**
+
+```
+E_t = 1 / (L_t × (1 + n_params/1000))
+
+where:
+- E_t: Efficiency at time t
+- n_params: Total network parameters
+```
+
+Penalizes large networks with poor performance.
+
+**Plasticity Detection:**
+
+```
+needs_plasticity = (ḡ > θ_g) ∨ (E_t < 0.8 × Ē)
+
+where:
+- ḡ: Average gradient norm
+- θ_g: gradient_threshold
+- Ē: Mean efficiency over recent epochs
+```
+
+**Growth Decision:**
+```
+grow = (stagnant ∨ needs_plasticity) ∧ (p_t ≥ P) ∧ (n_params < n_max)
+```
+
+**Intelligent Layer Selection:**
+
+Combined score for each layer:
+```
+S_i = (a_i / (n_i + 1)) × (1 + α_i)
+
+where:
+- a_i: Activity/gradient score
+- n_i: Current layer size
+- α_i: Activation magnitude
+```
+
+**Growth Type Decision:**
+
+```
+type = {
+    depth,  if (N < 3) ∨ (Var(layer_sizes) < μ × 0.1)
+    width,  otherwise
+}
+
+where:
+- N: Number of layers
+- μ: Mean layer size
+- Var: Variance of layer sizes
+```
+
+**Depth Growth:**
+```
+position = ⌊N/2⌋
+n_new = min(μ, n_max)
+```
+
+**Width Growth:**
+```
+i* = argmax{S_i}
+n_new = min(⌊n_i* × 0.5⌋, n_max)
+```
+
+---
+
+### BiologicalGrowth - Mathematical Formulation
+
+**Core Principle**: Biomimetic Neural Development
+Simulates biological neurogenesis, pruning, and metabolic constraints.
+
+**Neuron Activity (Firing Rate Analog):**
+
+1. **Layer Activity:**
+   ```
+   A_i = Σⱼ |w_ij| + |b_i|
+
+   Normalized: â_i = A_i / max(A)
+
+   where:
+   - w_ij: Weight from neuron j to i
+   - b_i: Bias of neuron i
+   ```
+
+2. **Temporal Activity:**
+   ```
+   Ā_i^(t) = (1/k) Σ_{τ=t-k}^t â_i^(τ)
+
+   where k = hebbian_window
+   ```
+
+**Energy Cost (Metabolic Constraint):**
+
+```
+E_metabolic = (n_params^1.2) × w_energy
+
+where:
+- n_params: Total parameters
+- w_energy: energy_cost_weight
+- 1.2 exponent: Nonlinear scaling (like brain metabolism)
+```
+
+**Network Efficiency:**
+
+```
+η = 1 / (L × (1 + n_params/1000))
+
+where:
+- L: Current loss
+- η: Efficiency (performance per parameter)
+```
+
+**Efficiency History:**
+
+```
+H_η = {η_{t-k}, ..., η_t}
+
+Declining efficiency: η_t < 0.8 × mean(H_η)
+```
+
+**Plasticity Need Detection:**
+
+```
+plasticity_needed = (ḡ > 0.05) ∨ (declining_efficiency)
+
+where ḡ = average gradient norm
+```
+
+**Activity-Dependent Growth:**
+
+High sustained activity triggers neurogenesis:
+```
+high_activity = Ā_overall > θ_A
+
+where:
+- Ā_overall = mean(Ā_i) across all layers
+- θ_A: activity_threshold
+```
+
+**Growth Decision (Hebbian-Inspired):**
+
+```
+grow = (plasticity_needed ∨ high_activity) ∧
+       (p_t ≥ P) ∧
+       (c_t ≥ C) ∧
+       (n_params < n_max)
+```
+
+**Competitive Resource Allocation:**
+
+Score for each layer (competitive growth):
+```
+S_i = (2 × Ā_i) + (1/(n_i + 1))
+
+where:
+- Ā_i: Activity score (favor active regions)
+- n_i: Layer size (favor small layers)
+```
+
+Target layer: `i* = argmax{S_i}`
+
+**Growth Magnitude (Activity-Dependent):**
+
+```
+n_base = max(⌊n_i* × 0.3⌋, 2)
+n_bonus = ⌊n_base × Ā_i*⌋
+n_new = min(n_base + n_bonus, n_max)
+```
+
+More active layers → more new neurons (like BDNF signaling).
+
+**Depth Growth (Cortical Development):**
+
+Triggered when activity is very high:
+```
+if max(Ā_i) > 0.7 and N < 6:
+    Add layer at position ⌊N/2⌋
+```
+
+**Synaptic Pruning:**
+
+1. **Neuron Importance:**
+   ```
+   I_j = ||w_·j||₂ + |b_j|
+
+   Normalized: î_j = I_j / max(I)
+   ```
+
+2. **Pruning Criterion:**
+   ```
+   prune_j = (î_j < θ_prune) ∧ (n_i > n_min)
+
+   where:
+   - θ_prune: pruning_threshold
+   - n_min: Minimum layer size (e.g., 8)
+   ```
+
+3. **Pruning Frequency:**
+   ```
+   Can prune if: (t - t_last_prune) > 2C
+
+   where C = cooldown
+   ```
+
+**"Use it or Lose it" Principle:**
+
+If >20% of layer's neurons have low activity:
+```
+weak_fraction = |{j : î_j < θ_prune}| / n_i
+
+if weak_fraction > 0.2:
+    Trigger pruning
+```
+
+---
+
 ## 🔬 How It Works
 
 ### Width Expansion

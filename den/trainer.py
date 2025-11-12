@@ -43,7 +43,7 @@ class DENTrainer:
         Args:
             network: DynamicExpandableNetwork instance
             growth_strategy: Strategy for network growth (default: LossBasedGrowth)
-            optimizer: Optimizer name ('adam', 'sgd', 'rmsprop')
+            optimizer: Optimizer name ('adam', 'adamw', 'sgd', 'rmsprop')
             learning_rate: Learning rate
             loss_function: Loss function (default: MSE for regression, CrossEntropy for classification)
             device: Device to train on
@@ -88,6 +88,8 @@ class DENTrainer:
         """Create optimizer instance."""
         if optimizer_name.lower() == 'adam':
             return optim.Adam(self.network.parameters(), lr=lr)
+        elif optimizer_name.lower() == 'adamw':
+            return optim.AdamW(self.network.parameters(), lr=lr)
         elif optimizer_name.lower() == 'sgd':
             return optim.SGD(self.network.parameters(), lr=lr, momentum=0.9)
         elif optimizer_name.lower() == 'rmsprop':

@@ -8,7 +8,13 @@ A PyTorch implementation of **Dynamically Expandable Neural Networks** that can 
 - **Width Expansion**: Add neurons to existing layers when needed
 - **Depth Expansion**: Add new layers to increase network capacity
 - **Continual Learning**: Learn from new data streams without forgetting
-- **Multiple Growth Strategies**: Choose from loss-based, gradient-based, or adaptive growth
+- **Multiple Growth Strategies**: Choose from loss-based, gradient-based, adaptive, or **biological growth**
+- **Biological Growth** 🧠 **NEW!**: Mimics real neural development in living creatures
+  - Activity-dependent neurogenesis
+  - Hebbian learning principles
+  - Synaptic pruning of weak neurons
+  - Energy efficiency optimization
+- **AdamW Optimizer**: Improved optimizer with weight decay
 - **Checkpoint/Restart**: Save and resume training at any point
 - **PyTorch Native**: Built entirely with PyTorch for seamless integration
 
@@ -168,7 +174,7 @@ strategy = GradientBasedGrowth(
 
 #### AdaptiveGrowth
 
-Combines multiple signals (recommended):
+Combines multiple signals (recommended for general use):
 
 ```python
 from den import AdaptiveGrowth
@@ -182,6 +188,34 @@ strategy = AdaptiveGrowth(
 )
 ```
 
+#### BiologicalGrowth
+
+**NEW!** Mimics neural development in living organisms:
+
+```python
+from den import BiologicalGrowth
+
+strategy = BiologicalGrowth(
+    patience=12,
+    cooldown=8,
+    activity_threshold=0.3,      # Neuron activity trigger
+    pruning_threshold=0.1,       # Prune weak neurons
+    energy_cost_weight=0.01,     # Metabolic cost penalty
+    max_neurons_per_expansion=16,
+    enable_pruning=True,         # Enable synaptic pruning
+    hebbian_window=5             # Activity correlation window
+)
+```
+
+**Biological Principles:**
+- **Activity-dependent neurogenesis**: Active neurons promote growth
+- **Hebbian learning**: "Neurons that fire together wire together"
+- **Synaptic pruning**: Removes weak/unused neurons
+- **Energy efficiency**: Balances performance vs. network size
+- **Competitive growth**: Resources allocated to active regions
+
+Perfect for applications mimicking brain development and adaptive learning!
+
 ### 3. DENTrainer
 
 Handles training with automatic growth.
@@ -190,7 +224,7 @@ Handles training with automatic growth.
 trainer = DENTrainer(
     network=network,
     growth_strategy=strategy,
-    optimizer='adam',           # 'adam', 'sgd', or 'rmsprop'
+    optimizer='adamw',          # 'adam', 'adamw', 'sgd', or 'rmsprop'
     learning_rate=0.001,
     device='cuda',             # 'cuda' or 'cpu'
     verbose=True
@@ -248,6 +282,25 @@ python classification_example.py
 ```
 
 Multi-class classification with dynamic architecture.
+
+### Example 4: Biological Growth (NEW!)
+
+```bash
+python biological_growth_example.py
+```
+
+**Mimics how real brains develop!** Watch the network grow through developmental stages:
+- **Infant stage**: Learning simple patterns with basic neural circuits
+- **Child stage**: Developing complex representations
+- **Adult stage**: Mastering abstract concepts
+
+Features biological principles:
+- Activity-dependent neurogenesis (neurons grow where needed)
+- Hebbian learning (firing together = wiring together)
+- Synaptic pruning (weak connections removed)
+- Energy efficiency optimization
+
+This is the most realistic simulation of how living brains learn and adapt!
 
 ## 🏗️ Architecture
 
